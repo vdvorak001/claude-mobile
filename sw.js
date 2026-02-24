@@ -1,12 +1,12 @@
-const CACHE_NAME = "claude-mobile-v1";
+const CACHE_NAME = "claude-mobile-v2";
 const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/css/style.css",
-  "/js/app.js",
-  "/js/ntfy.js",
-  "/js/ui.js",
-  "/manifest.json",
+  "./",
+  "./index.html",
+  "./css/style.css",
+  "./js/app.js",
+  "./js/ntfy.js",
+  "./js/ui.js",
+  "./manifest.json",
 ];
 
 self.addEventListener("install", (e) => {
