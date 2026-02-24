@@ -46,28 +46,25 @@
   - Audio beep (Web Audio API, 880Hz sine)
   - Service worker registrace
 
-### IN PROGRESS
+- [x] **1.6 Identifikace chatu/projektu**
+  - Auto-detect project z PWD/cwd (s aliasy: DCE, NGPD, Mobile)
+  - `notify-mobile.sh` — `[PROJECT]` badge v title u všech typů
+  - `permission-hook.sh` — extrakce `cwd` ze stdin JSON
+  - PWA: project badge na kartě (modrý neon chip)
 
-- [ ] **1.6 Identifikace chatu/projektu**
-  - Přidat název projektu do notifikací (z `cwd` nebo `$CLAUDE_PROJECT_DIR`)
-  - Upravit `notify-mobile.sh` — přidat project name do title/body
-  - Upravit `permission-hook.sh` — extrahovat `cwd` ze stdin JSON
-  - PWA: zobrazit project badge na kartě
+- [x] **1.7 Vylepšení permission notifikací**
+  - Kategorie příkazu (git / python / file / docker / network / node / other)
+  - Úroveň rizika (low / medium / high) na základě příkazu
+  - Lidsky čitelný popis (např. "Git operace měnící vzdálenou historii")
+  - Inline `code` rendering pro příkazy v PWA
 
-- [ ] **1.7 Vylepšení permission notifikací**
-  - Kategorie příkazu (git / python / soubory / síť / systém)
-  - Úroveň rizika (nízká / střední / vysoká) s barevným indikátorem
-  - Lidsky čitelný popis co příkaz dělá
-  - PWA: rozšířená karta s kategorie badge a risk level
+- [x] **1.8 Nasazení na GitHub Pages**
+  - Repo: https://github.com/vdvorak001/claude-mobile
+  - URL: **https://vdvorak001.github.io/claude-mobile/**
+  - Relativní cesty (./) pro subdirectory hosting
+  - Service worker cache v2 s relativními cestami
 
 ### TODO
-
-- [ ] **1.8 Nasazení na GitHub Pages**
-  - Inicializace git repozitáře pro `claude-mobile/`
-  - Push na GitHub (veřejný nebo privátní repo)
-  - Aktivace GitHub Pages (branch `main`, root `/`)
-  - HTTPS URL pro přístup odkudkoli
-  - Aktualizace `manifest.json` start_url
 
 - [ ] **1.9 Web Push notifikace**
   - VAPID klíče (veřejný + privátní)
