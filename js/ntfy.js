@@ -85,6 +85,17 @@ const Ntfy = (() => {
     intentionalClose = false;
     _loadLastSince();
     _connect();
+
+    // Reconnect immediately when user returns to the app (tab/PWA visible again)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && !intentionalClose) {
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectDelay = 1000; // reset backoff
+          _connect();
+        }
+      }
+    });
   }
 
   function _connect() {
