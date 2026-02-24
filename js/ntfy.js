@@ -14,8 +14,10 @@ const Ntfy = (() => {
   let onMessageCallback = null;
   let onStatusCallback = null;
   let lastSince = null; // Unix timestamp of last received message (persisted)
+  let watchdogTimer = null; // Force reconnect if no WS activity for WATCHDOG_MS
 
-  const MAX_RECONNECT_DELAY = 30000;
+  const MAX_RECONNECT_DELAY = 10000; // Max 10s backoff (was 30s)
+  const WATCHDOG_MS = 55000;         // ntfy.sh sends keepalive every ~45s
   const SINCE_KEY = "claude_mobile_since";
 
   function _loadLastSince() {
@@ -77,6 +79,28 @@ const Ntfy = (() => {
     if (onStatusCallback) onStatusCallback(status);
   }
 
+  /** Reset watchdog timer — call on every WS activity (open, message, keepalive). */
+  function _resetWatchdog() {
+    if (watchdogTimer) clearTimeout(watchdogTimer);
+    watchdogTimer = setTimeout(() => {
+      // No activity for WATCHDOG_MS — connection is stale, force reconnect
+      if (ws) ws.close();
+    }, WATCHDOG_MS);
+  }
+
+  function _clearWatchdog() {
+    if (watchdogTimer) {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = null;
+    }
+  }
+
+  function _forceReconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectDelay = 1000;
+    _connect();
+  }
+
   function connect(cfg) {
     topic = cfg.topic;
     replyTopic = cfg.replyTopic;
@@ -90,11 +114,14 @@ const Ntfy = (() => {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible" && !intentionalClose) {
         if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          if (reconnectTimer) clearTimeout(reconnectTimer);
-          reconnectDelay = 1000; // reset backoff
-          _connect();
+          _forceReconnect();
         }
       }
+    });
+
+    // Reconnect immediately when network comes back online
+    window.addEventListener("online", () => {
+      if (!intentionalClose) _forceReconnect();
     });
   }
 
@@ -112,18 +139,21 @@ const Ntfy = (() => {
     ws.onopen = () => {
       reconnectDelay = 1000;
       setStatus("connected");
+      _resetWatchdog();
     };
 
     ws.onmessage = (event) => {
+      _resetWatchdog(); // any WS activity resets the stale-connection watchdog
       try {
         const msg = JSON.parse(event.data);
-        // Skip keepalive/open events
+        // Skip keepalive/open events (but still reset watchdog above)
         if (msg.event && msg.event !== "message") return;
         _processMessage(msg);
       } catch { /* ignore parse errors */ }
     };
 
     ws.onclose = () => {
+      _clearWatchdog();
       if (!intentionalClose) {
         setStatus("disconnected");
         _scheduleReconnect();
@@ -208,6 +238,7 @@ const Ntfy = (() => {
 
   function disconnect() {
     intentionalClose = true;
+    _clearWatchdog();
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws) ws.close();
     setStatus("disconnected");
