@@ -13,8 +13,24 @@ const Ntfy = (() => {
   let intentionalClose = false;
   let onMessageCallback = null;
   let onStatusCallback = null;
+  let lastSince = null; // Unix timestamp of last received message (persisted)
 
   const MAX_RECONNECT_DELAY = 30000;
+  const SINCE_KEY = "claude_mobile_since";
+
+  function _loadLastSince() {
+    try {
+      const v = localStorage.getItem(SINCE_KEY);
+      if (v) lastSince = parseInt(v, 10);
+    } catch { /* ignore */ }
+  }
+
+  function _saveLastSince(ts) {
+    if (!lastSince || ts > lastSince) {
+      lastSince = ts;
+      try { localStorage.setItem(SINCE_KEY, String(ts)); } catch { /* ignore */ }
+    }
+  }
 
   /**
    * Detect notification type from ntfy.sh message tags.
@@ -67,6 +83,7 @@ const Ntfy = (() => {
     onMessageCallback = cfg.onMessage;
     onStatusCallback = cfg.onStatus;
     intentionalClose = false;
+    _loadLastSince();
     _connect();
   }
 
@@ -77,35 +94,37 @@ const Ntfy = (() => {
 
     setStatus("reconnecting");
 
-    // Fetch recent messages first (last 10 min)
-    _fetchRecent().then(() => {
-      ws = new WebSocket(`wss://ntfy.sh/${topic}/ws`);
+    // Open WebSocket immediately — no gap between history fetch and live stream.
+    // Any message arriving during the fetch is caught by WS; deduplication handles overlaps.
+    ws = new WebSocket(`wss://ntfy.sh/${topic}/ws`);
 
-      ws.onopen = () => {
-        reconnectDelay = 1000;
-        setStatus("connected");
-      };
+    ws.onopen = () => {
+      reconnectDelay = 1000;
+      setStatus("connected");
+    };
 
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          // Skip keepalive/open events
-          if (msg.event && msg.event !== "message") return;
-          _processMessage(msg);
-        } catch { /* ignore parse errors */ }
-      };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        // Skip keepalive/open events
+        if (msg.event && msg.event !== "message") return;
+        _processMessage(msg);
+      } catch { /* ignore parse errors */ }
+    };
 
-      ws.onclose = () => {
-        if (!intentionalClose) {
-          setStatus("disconnected");
-          _scheduleReconnect();
-        }
-      };
+    ws.onclose = () => {
+      if (!intentionalClose) {
+        setStatus("disconnected");
+        _scheduleReconnect();
+      }
+    };
 
-      ws.onerror = () => {
-        // onclose will fire after onerror
-      };
-    });
+    ws.onerror = () => {
+      // onclose will fire after onerror
+    };
+
+    // Fetch missed messages in parallel (deduplication handles WS overlaps)
+    _fetchRecent();
   }
 
   function _processMessage(msg) {
@@ -126,12 +145,16 @@ const Ntfy = (() => {
       answeredWith: null,
     };
 
+    if (msg.time) _saveLastSince(msg.time);
     if (onMessageCallback) onMessageCallback(notification);
   }
 
   async function _fetchRecent() {
     try {
-      const since = Math.floor(Date.now() / 1000) - 600; // last 10 min
+      // Use persisted lastSince (minus 5s overlap) or fall back to 1 hour.
+      // This covers cases where the app was backgrounded for more than 10 min.
+      const fallback = Math.floor(Date.now() / 1000) - 3600;
+      const since = lastSince ? Math.max(lastSince - 5, fallback) : fallback;
       const res = await fetch(
         `https://ntfy.sh/${topic}/json?poll=1&since=${since}`
       );
