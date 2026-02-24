@@ -1,10 +1,11 @@
-const CACHE_NAME = "claude-mobile-v2";
+const CACHE_NAME = "claude-mobile-v3";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
   "./css/style.css",
   "./js/app.js",
   "./js/ntfy.js",
+  "./js/push.js",
   "./js/ui.js",
   "./manifest.json",
 ];
@@ -41,5 +42,71 @@ self.addEventListener("fetch", (e) => {
     caches
       .match(e.request)
       .then((cached) => cached || fetch(e.request))
+  );
+});
+
+// ── Web Push ──
+
+self.addEventListener("push", (e) => {
+  if (!e.data) return;
+
+  let title = "Claude Mobile";
+  let body = "";
+  let tag = "claude-push";
+  let requireInteraction = false;
+
+  try {
+    const payload = e.data.json();
+
+    // Handle subscription expiry warning
+    if (payload.event === "subscription_expiring") {
+      title = "Claude Mobile — Push expiruje";
+      body = "Obnov Web Push v nastavení aplikace.";
+      tag = "push-expiry";
+    } else {
+      // Normal message payload
+      const msg = payload.message || payload;
+      if (!msg || (msg.event && msg.event !== "message")) return;
+
+      title = msg.title || "Claude Mobile";
+      body = msg.message || "";
+      tag = msg.id || "claude-push";
+      // Require interaction for actionable types (approve/choice/permission)
+      const tags = msg.tags || [];
+      requireInteraction =
+        tags.includes("question") ||
+        tags.includes("lock") ||
+        tags.includes("point_right");
+    }
+  } catch {
+    body = e.data.text();
+  }
+
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "./icons/icon-192.png",
+      badge: "./icons/icon-192.png",
+      tag,
+      requireInteraction,
+      vibrate: [200, 100, 200],
+      data: { url: self.registration.scope },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((list) => {
+        for (const client of list) {
+          if (client.url.startsWith(self.registration.scope) && "focus" in client) {
+            return client.focus();
+          }
+        }
+        return clients.openWindow(self.registration.scope);
+      })
   );
 });

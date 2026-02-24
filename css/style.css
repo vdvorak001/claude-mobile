@@ -536,3 +536,30 @@ input[type="checkbox"] {
   width: 18px;
   height: 18px;
 }
+
+/* ── Web Push button ── */
+.btn-push {
+  background: rgba(0, 255, 136, 0.06);
+  color: var(--neon-green);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  width: 100%;
+  margin-bottom: 8px;
+}
+.btn-push-active {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: rgba(0, 255, 136, 0.4);
+  box-shadow: var(--glow-sm) rgba(0, 255, 136, 0.25);
+}
+.push-status {
+  display: block;
+  font-size: 11px;
+  color: var(--neon-green);
+  opacity: 0.8;
+  min-height: 16px;
+}
+.setting-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}

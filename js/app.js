@@ -29,6 +29,7 @@ const App = (() => {
     setupSettings();
     registerServiceWorker();
     connectNtfy();
+    initPush();
   }
 
   // ── ntfy.sh Connection ──
@@ -170,6 +171,10 @@ const App = (() => {
       // Reconnect with new settings
       Ntfy.disconnect();
       connectNtfy();
+      // Update push subscription topics if active
+      Push.isSubscribed().then((subscribed) => {
+        if (subscribed) Push.updateTopics([settings.topic]).catch(() => {});
+      });
     });
 
     btnClear.addEventListener("click", () => {
@@ -262,6 +267,53 @@ const App = (() => {
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
+  }
+
+  // ── Web Push ──
+  async function initPush() {
+    const btn = document.getElementById("btn-push-toggle");
+    const statusEl = document.getElementById("push-status");
+
+    if (!Push.isSupported()) {
+      if (btn) {
+        btn.textContent = "Not supported";
+        btn.disabled = true;
+      }
+      return;
+    }
+
+    await _refreshPushUI();
+
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          if (await Push.isSubscribed()) {
+            await Push.unsubscribe();
+          } else {
+            await Push.subscribe([settings.topic]);
+          }
+        } catch (err) {
+          if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+        } finally {
+          btn.disabled = false;
+          await _refreshPushUI();
+        }
+      });
+    }
+  }
+
+  async function _refreshPushUI() {
+    const btn = document.getElementById("btn-push-toggle");
+    const statusEl = document.getElementById("push-status");
+    if (!btn) return;
+
+    const subscribed = await Push.isSubscribed();
+    btn.textContent = subscribed ? "Disable Push" : "Enable Push";
+    btn.classList.toggle("btn-push-active", subscribed);
+    if (statusEl) {
+      statusEl.textContent = subscribed ? "Active — notifications arrive even when app is closed" : "";
     }
   }
 
