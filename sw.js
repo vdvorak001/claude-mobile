@@ -1,4 +1,4 @@
-const CACHE_NAME = "claude-mobile-v3";
+const CACHE_NAME = "claude-mobile-v4";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -83,15 +83,23 @@ self.addEventListener("push", (e) => {
   }
 
   e.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: "./icons/icon-192.png",
-      badge: "./icons/icon-192.png",
-      tag,
-      requireInteraction,
-      vibrate: [200, 100, 200],
-      data: { url: self.registration.scope },
-    })
+    Promise.all([
+      self.registration.showNotification(title, {
+        body,
+        icon: "./icons/icon-192.png",
+        badge: "./icons/icon-192.png",
+        tag,
+        requireInteraction,
+        vibrate: [200, 100, 200],
+        data: { url: self.registration.scope },
+      }),
+      // Wake up any open client windows so they reconnect and fetch messages
+      clients.matchAll({ type: "window" }).then((list) => {
+        for (const client of list) {
+          client.postMessage({ type: "push-received" });
+        }
+      }),
+    ])
   );
 });
 

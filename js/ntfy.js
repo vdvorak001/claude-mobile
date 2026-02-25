@@ -98,6 +98,11 @@ const Ntfy = (() => {
   function _forceReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectDelay = 1000;
+    // If WS is already open, just fetch recent messages (no reconnect needed)
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      _fetchRecent();
+      return;
+    }
     _connect();
   }
 
@@ -123,6 +128,15 @@ const Ntfy = (() => {
     window.addEventListener("online", () => {
       if (!intentionalClose) _forceReconnect();
     });
+
+    // Service Worker push received — reconnect and fetch immediately
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (e) => {
+        if (e.data && e.data.type === "push-received") {
+          _forceReconnect();
+        }
+      });
+    }
   }
 
   function _connect() {
