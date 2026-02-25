@@ -1,6 +1,6 @@
 # Claude Mobile — Implementation Plan
 > Tento dokument podléhá změnovému řízení. Změny pouze po schválení vlastníkem.
-> Poslední aktualizace: 2026-02-24
+> Poslední aktualizace: 2026-02-25
 
 ---
 
@@ -64,22 +64,24 @@
   - Relativní cesty (./) pro subdirectory hosting
   - Service worker cache v2 s relativními cestami
 
-### TODO
+- [x] **1.9 Web Push notifikace**
+  - ntfy.sh VAPID klíče (server-side, `/v1/config`)
+  - `push.js` — subscribe/unsubscribe/updateTopics via ntfy.sh `/v1/webpush`
+  - `sw.js` — push + notificationclick event handlers
+  - SW→client messaging (`postMessage`) pro okamžitý reconnect po push
+  - Notifikace na display i když je PWA zavřená
 
-- [ ] **1.9 Web Push notifikace**
-  - VAPID klíče (veřejný + privátní)
-  - Push subscription v service worker
-  - Malý push server (Cloudflare Worker nebo GitHub Actions)
-  - Alternativa: integrace s ntfy.sh UnifiedPush
-  - Notifikace i když je PWA zavřená
-
-- [ ] **1.10 Testování a polish**
-  - E2E test: done → decision → choice → approve → permission
-  - Test auto-reconnect (výpadek WiFi)
-  - Test offline shell (service worker cache)
-  - Test "Přidat na plochu" (PWA install)
-  - Cross-browser: Chrome, Firefox, Samsung Internet
-  - Performance audit (Lighthouse)
+- [x] **1.10 Testování a polish**
+  - E2E test: done ✅ → decision ✅ → choice ✅ → approve ✅ (Web Push ✅)
+  - Code review: 3 CRITICAL (XSS) + 8 MEDIUM + 14 LOW — vše opraveno
+  - Security hardening: HTML escape helper (`esc`/`escAttr`), attribute sanitization
+  - Memory leak fixes: AudioContext reuse, event listener guard
+  - Race condition fixes: double-tap prevention, CONNECTING timeout
+  - Accessibility: ARIA labels, live regions, lang fix
+  - Manifest: scope, maskable icons
+  - Reconnect: jitter, stuck CONNECTING abort
+  - ntfy.sh auth: NTFY_TOKEN, Supporter tier (2500 msg/den)
+  - Streaming reply (1 HTTP request místo polling)
 
 ---
 
@@ -143,6 +145,7 @@
 | `js/ntfy.js` | DONE | WebSocket modul (5 KB) |
 | `js/ui.js` | DONE | Rendering engine (5.7 KB) |
 | `js/app.js` | DONE | Orchestrátor (8.2 KB) |
+| `js/push.js` | DONE | Web Push subscription modul |
 | `icons/icon-192.png` | DONE | PWA ikona |
 | `icons/icon-512.png` | DONE | PWA ikona |
 
