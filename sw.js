@@ -1,4 +1,6 @@
-const CACHE_NAME = "claude-mobile-v4";
+"use strict";
+
+const CACHE_NAME = "claude-mobile-v5";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -48,7 +50,16 @@ self.addEventListener("fetch", (e) => {
 // ── Web Push ──
 
 self.addEventListener("push", (e) => {
-  if (!e.data) return;
+  if (!e.data) {
+    e.waitUntil(
+      self.registration.showNotification("Claude Mobile", {
+        body: "New update available",
+        icon: "./icons/icon-192.png",
+        tag: "generic-push",
+      })
+    );
+    return;
+  }
 
   let title = "Claude Mobile";
   let body = "";

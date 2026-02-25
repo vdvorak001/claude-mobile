@@ -54,6 +54,10 @@ const App = (() => {
     if (existing) return;
 
     notifications.unshift(notification);
+    // Trim in-memory array to prevent unbounded growth
+    if (notifications.length > MAX_HISTORY) {
+      notifications.length = MAX_HISTORY;
+    }
 
     // Haptic feedback for actionable notifications
     if (notification.type === "approve" || notification.type === "permission" || notification.type === "choice") {
@@ -115,17 +119,26 @@ const App = (() => {
     const notification = notifications.find((n) => n.id === notifId);
     if (!notification || notification.answered) return;
 
+    // Mark answered immediately to prevent double-tap race condition
+    notification.answered = true;
+    notification.answeredWith = responseBody;
+    renderDashboard();
+
     const ok = await Ntfy.respond(responseBody);
     if (!ok) {
       // Retry once
       await new Promise((r) => setTimeout(r, 1000));
-      await Ntfy.respond(responseBody);
+      const retryOk = await Ntfy.respond(responseBody);
+      if (!retryOk) {
+        // Both attempts failed — revert answered state
+        notification.answered = false;
+        notification.answeredWith = null;
+        renderDashboard();
+        return;
+      }
     }
 
-    notification.answered = true;
-    notification.answeredWith = responseBody;
     saveHistory();
-    renderDashboard();
   }
 
   // ── Event Delegation ──
@@ -196,13 +209,18 @@ const App = (() => {
       }
     } catch { /* use defaults */ }
 
-    // Populate form
-    document.addEventListener("DOMContentLoaded", () => {
+    // Populate form (works whether DOM is already loaded or not)
+    function _populateForm() {
       document.getElementById("setting-topic").value = settings.topic;
       document.getElementById("setting-reply").value = settings.replyTopic;
       document.getElementById("setting-vibrate").checked = settings.vibrate;
       document.getElementById("setting-sound").checked = settings.sound;
-    });
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", _populateForm);
+    } else {
+      _populateForm();
+    }
   }
 
   function saveSettings() {
@@ -247,19 +265,23 @@ const App = (() => {
   }
 
   // ── Sound ──
+  let _audioCtx = null;
   function playBeep() {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      if (!_audioCtx) {
+        _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (_audioCtx.state === "suspended") _audioCtx.resume();
+      const osc = _audioCtx.createOscillator();
+      const gain = _audioCtx.createGain();
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(_audioCtx.destination);
       osc.frequency.value = 880;
       osc.type = "sine";
       gain.gain.value = 0.15;
       osc.start();
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.stop(ctx.currentTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.3);
+      osc.stop(_audioCtx.currentTime + 0.3);
     } catch { /* no audio context */ }
   }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -21,8 +21,8 @@
       <span class="header-title">Claude Mobile</span>
     </div>
     <div class="header-right">
-      <span id="status-dot" class="status-dot disconnected"></span>
-      <span id="status-text" class="status-text">Connecting...</span>
+      <span id="status-dot" class="status-dot disconnected" role="status"></span>
+      <span id="status-text" class="status-text" aria-live="polite">Connecting...</span>
     </div>
   </header>
 
@@ -31,8 +31,8 @@
 
     <!-- Dashboard view -->
     <section id="view-dashboard" class="view active">
-      <div id="pending-area"></div>
-      <div id="feed" class="feed"></div>
+      <div id="pending-area" aria-live="assertive"></div>
+      <div id="feed" class="feed" aria-live="polite"></div>
       <div id="empty-state" class="empty-state">
         <div class="empty-icon">&#x1f4e1;</div>
         <p>Waiting for notifications...</p>
@@ -85,15 +85,15 @@
 
   <!-- ── Bottom nav ── -->
   <nav id="nav">
-    <button class="nav-btn active" data-view="dashboard">
+    <button class="nav-btn active" data-view="dashboard" aria-label="Live dashboard">
       <span class="nav-icon">&#x1f4cb;</span>
       <span class="nav-label">Live</span>
     </button>
-    <button class="nav-btn" data-view="history">
+    <button class="nav-btn" data-view="history" aria-label="Notification history">
       <span class="nav-icon">&#x1f552;</span>
       <span class="nav-label">History</span>
     </button>
-    <button class="nav-btn" data-view="settings">
+    <button class="nav-btn" data-view="settings" aria-label="Settings">
       <span class="nav-icon">&#x2699;</span>
       <span class="nav-label">Settings</span>
     </button>

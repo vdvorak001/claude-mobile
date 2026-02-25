@@ -15,9 +15,11 @@ const Ntfy = (() => {
   let onStatusCallback = null;
   let lastSince = null; // Unix timestamp of last received message (persisted)
   let watchdogTimer = null; // Force reconnect if no WS activity for WATCHDOG_MS
+  let connectingTimer = null; // Abort stuck CONNECTING state
 
   const MAX_RECONNECT_DELAY = 10000; // Max 10s backoff (was 30s)
   const WATCHDOG_MS = 55000;         // ntfy.sh sends keepalive every ~45s
+  const CONNECTING_TIMEOUT_MS = 10000; // Abort if stuck in CONNECTING for 10s
   const SINCE_KEY = "claude_mobile_since";
 
   function _loadLastSince() {
@@ -106,6 +108,27 @@ const Ntfy = (() => {
     _connect();
   }
 
+  // Named event handlers (prevent listener accumulation on reconnect)
+  function _onVisibilityChange() {
+    if (document.visibilityState === "visible" && !intentionalClose) {
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        _forceReconnect();
+      }
+    }
+  }
+
+  function _onOnline() {
+    if (!intentionalClose) _forceReconnect();
+  }
+
+  function _onSwMessage(e) {
+    if (e.data && e.data.type === "push-received") {
+      _forceReconnect();
+    }
+  }
+
+  let _listenersAttached = false;
+
   function connect(cfg) {
     topic = cfg.topic;
     replyTopic = cfg.replyTopic;
@@ -115,27 +138,13 @@ const Ntfy = (() => {
     _loadLastSince();
     _connect();
 
-    // Reconnect immediately when user returns to the app (tab/PWA visible again)
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && !intentionalClose) {
-        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          _forceReconnect();
-        }
+    if (!_listenersAttached) {
+      document.addEventListener("visibilitychange", _onVisibilityChange);
+      window.addEventListener("online", _onOnline);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("message", _onSwMessage);
       }
-    });
-
-    // Reconnect immediately when network comes back online
-    window.addEventListener("online", () => {
-      if (!intentionalClose) _forceReconnect();
-    });
-
-    // Service Worker push received — reconnect and fetch immediately
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("message", (e) => {
-        if (e.data && e.data.type === "push-received") {
-          _forceReconnect();
-        }
-      });
+      _listenersAttached = true;
     }
   }
 
@@ -150,7 +159,16 @@ const Ntfy = (() => {
     // Any message arriving during the fetch is caught by WS; deduplication handles overlaps.
     ws = new WebSocket(`wss://ntfy.sh/${topic}/ws`);
 
+    // Abort if stuck in CONNECTING state (flaky mobile network)
+    if (connectingTimer) clearTimeout(connectingTimer);
+    connectingTimer = setTimeout(() => {
+      if (ws && ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    }, CONNECTING_TIMEOUT_MS);
+
     ws.onopen = () => {
+      if (connectingTimer) { clearTimeout(connectingTimer); connectingTimer = null; }
       reconnectDelay = 1000;
       setStatus("connected");
       _resetWatchdog();
@@ -228,10 +246,12 @@ const Ntfy = (() => {
 
   function _scheduleReconnect() {
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    // Add jitter (0.5x–1.5x) to prevent thundering herd on server recovery
+    const jitter = reconnectDelay * (0.5 + Math.random());
     reconnectTimer = setTimeout(() => {
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
       _connect();
-    }, reconnectDelay);
+    }, jitter);
   }
 
   /**

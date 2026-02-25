@@ -129,12 +129,11 @@ body {
 /* ── Main ── */
 #main {
   position: fixed;
-  top: var(--header-h);
+  top: calc(var(--header-h) + env(safe-area-inset-top, 0px));
   bottom: var(--nav-h);
   left: 0;
   right: 0;
   overflow: hidden;
-  padding-top: env(safe-area-inset-top);
 }
 
 .view {

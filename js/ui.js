@@ -4,6 +4,21 @@
  * ui.js — DOM rendering for notification cards, status, navigation.
  */
 const UI = (() => {
+  /** Escape HTML special characters to prevent XSS. */
+  function esc(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  /** Escape string for use inside HTML attribute values. */
+  function escAttr(str) {
+    return esc(str);
+  }
+
   const TYPE_META = {
     done:       { icon: "\u2705", label: "Done",       cls: "card-done" },
     decision:   { icon: "\u26a0\ufe0f", label: "Decision",   cls: "card-decision" },
@@ -44,9 +59,7 @@ const UI = (() => {
    * Parse markdown-like bold (**text**) and newlines in message body.
    */
   function renderBody(text) {
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
+    return esc(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\\n/g, "\n");
@@ -63,10 +76,10 @@ const UI = (() => {
 
     return `
       <div class="card-actions">
-        <button class="btn btn-approve" data-response="${okAction.body}" data-notif-id="${notification.id}">
+        <button class="btn btn-approve" data-response="${escAttr(okAction.body)}" data-notif-id="${escAttr(notification.id)}">
           OK
         </button>
-        ${nokAction ? `<button class="btn btn-deny" data-response="${nokAction.body}" data-notif-id="${notification.id}">
+        ${nokAction ? `<button class="btn btn-deny" data-response="${escAttr(nokAction.body)}" data-notif-id="${escAttr(notification.id)}">
           Deny
         </button>` : ""}
       </div>`;
@@ -93,8 +106,8 @@ const UI = (() => {
       const letter = action.label;
       const desc = descMap[letter] || "";
       html += `
-        <button class="btn btn-choice" data-response="${action.body}" data-notif-id="${notification.id}">
-          <span class="choice-letter">${letter}</span>
+        <button class="btn btn-choice" data-response="${escAttr(action.body)}" data-notif-id="${escAttr(notification.id)}">
+          <span class="choice-letter">${esc(letter)}</span>
           ${desc ? `<span class="choice-desc">${renderBody(desc)}</span>` : ""}
         </button>`;
     }
@@ -133,7 +146,7 @@ const UI = (() => {
     const { project, cleanTitle } = parseProject(notification.title || "");
 
     const projectBadge = project
-      ? `<span class="card-project">${project}</span>`
+      ? `<span class="card-project">${esc(project)}</span>`
       : "";
 
     const el = document.createElement("div");
@@ -148,7 +161,7 @@ const UI = (() => {
         </span>
         <span class="card-time">${fmtTime(notification.time)}</span>
       </div>
-      ${cleanTitle ? `<div class="card-title">${cleanTitle}</div>` : ""}
+      ${cleanTitle ? `<div class="card-title">${esc(cleanTitle)}</div>` : ""}
       <div class="card-body">${renderBody(notification.message)}</div>
       ${actionsHtml}
       ${statusBadge}
